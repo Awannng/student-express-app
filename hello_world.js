@@ -1,14 +1,17 @@
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const express = require("express");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
 
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-const port = process.env.PORt || 3000;
+const port = process.env.PORT || 3000;
+
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+const { clerkClient } = require("./lib/clerk");
 
 const studentList = [
   {
@@ -124,4 +127,22 @@ app.post("/students", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
+});
+
+//Clerk
+app.post("/register", async (req, res) => {
+  const { emailAddress, password } = req.body;
+  const user = await clerkClient.users.createUser({
+    emailAddress: [emailAddress],
+    password,
+  });
+  await prisma.user.create({
+    data: { authId: user.id, email: emailAddress.toLowerCase() },
+  });
+
+  const signInToken = await clerkClient.signInTokens.createSignInToken({
+    userId: user.id,
+  });
+  res.cookie("accessToken", signInToken.token);
+  res.json(signInToken);
 });
